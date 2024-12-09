@@ -61,11 +61,8 @@ def plot_multi_metrics(scores, vmaf_file_names):
 
 
 def plot_metric(scores, metric):
-
     x = [x for x in range(len(scores))]
-
     mean = round(sum(scores) / len(scores), 3)
-
     plot_size = len(scores)
 
     # get percentiles
@@ -75,15 +72,21 @@ def plot_metric(scores, metric):
 
     # Plot
     figure_width = 3 + round((4 * log10(plot_size)))
-
     plt.figure(figsize=(figure_width, 5))
 
-    if metric == "SSIM":
-        [plt.axhline(i / 100, color="grey", linewidth=0.4) for i in range(0, 100)]
-        [plt.axhline(i / 100, color="black", linewidth=0.6) for i in range(0, 100, 5)]
-    else:
+    # Draw grid lines based on metric type
+    if metric == "VMAF":
         [plt.axhline(i, color="grey", linewidth=0.4) for i in range(0, 100)]
         [plt.axhline(i, color="black", linewidth=0.6) for i in range(0, 100, 5)]
+        plt.ylim(int(perc_1), 100)
+    elif metric == "SSIM":
+        [plt.axhline(i / 100, color="grey", linewidth=0.4) for i in range(0, 100)]
+        [plt.axhline(i / 100, color="black", linewidth=0.6) for i in range(0, 100, 5)]
+        plt.ylim(perc_1, 1.0)
+    else:  # PSNR
+        [plt.axhline(i, color="grey", linewidth=0.4) for i in range(0, 100)]
+        [plt.axhline(i, color="black", linewidth=0.6) for i in range(0, 100, 5)]
+        plt.ylim(int(perc_1), max(scores))
 
     plt.plot(
         x,
@@ -110,17 +113,6 @@ def plot_metric(scores, metric):
         loc="upper center", bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True
     )
 
-    if metric == "VMAF":
-        top_y = 100
-    else:
-        top_y = max(scores)
-
-    if metric in ("VMAF", "PSNR"):
-        bottom_y = int(perc_1)
-    else:
-        bottom_y = perc_1
-
-    plt.ylim(bottom_y, top_y)
     plt.tight_layout()
     plt.margins(0)
 
@@ -141,7 +133,7 @@ def main():
         if len(args.metrics) == 1:
             plot_metric(to_plot[0], metric)
         else:
-            plot_multi_metrics(metric, vmaf_file_names)
+            plot_multi_metrics(to_plot, vmaf_file_names)
 
 
 def parse_arguments():

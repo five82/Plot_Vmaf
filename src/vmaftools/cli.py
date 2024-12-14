@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 import sys
 import argparse
 import numpy as np
@@ -8,12 +8,13 @@ import json
 from math import log10
 from statistics import mean, harmonic_mean
 
+# Make args global like the original script
+args = None
 
 def read_json(file):
     with open(file, "r") as f:
         fl = json.load(f)
         return fl
-
 
 def plot_multi_metrics(scores, vmaf_file_names):
     i = 0
@@ -56,9 +57,7 @@ def plot_multi_metrics(scores, vmaf_file_names):
     plt.tight_layout()
     plt.margins(0)
 
-    # Save
     plt.savefig(args.output, dpi=500)
-
 
 def plot_metric(scores, metric):
     x = [x for x in range(len(scores))]
@@ -116,11 +115,22 @@ def plot_metric(scores, metric):
     plt.tight_layout()
     plt.margins(0)
 
-    # Save
     plt.savefig(args.output, dpi=500)
 
-
 def main():
+    global args
+    parser = argparse.ArgumentParser(description="Plot vmaf to graph")
+    parser.add_argument("vmaf_file", type=str, nargs="+", help="Vmaf log file")
+    parser.add_argument(
+        "-o", "--output", dest="output", type=str, default="plot.png",
+        help="Graph output filename (default plot.png)"
+    )
+    parser.add_argument(
+        "-m", "--metrics", default=["VMAF"], help="what metrics to plot",
+        type=str, nargs="+", choices=["VMAF", "PSNR", "SSIM"]
+    )
+    args = parser.parse_args()
+
     to_plot = []
     vmaf_file_names = []
     for metric in args.metrics:
@@ -135,31 +145,10 @@ def main():
         else:
             plot_multi_metrics(to_plot, vmaf_file_names)
 
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Plot vmaf to graph")
-    parser.add_argument("vmaf_file", type=str, nargs="+", help="Vmaf log file")
-    parser.add_argument(
-        "-o",
-        "--output",
-        dest="output",
-        type=str,
-        default="plot.png",
-        help="Graph output filename (default plot.png)",
-    )
-    parser.add_argument(
-        "-m",
-        "--metrics",
-        default=["VMAF"],
-        help="what metrics to plot",
-        type=str,
-        nargs="+",
-        choices=["VMAF", "PSNR", "SSIM"],
-    )
-
-    return parser.parse_args()
-
+def generate_vmaf():
+    """Entry point for generate-vmaf command"""
+    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'generate_vmaf.sh')
+    os.execv('/bin/bash', ['bash', script_path] + sys.argv[1:])
 
 if __name__ == "__main__":
-    args = parse_arguments()
-    main()
+    main() 

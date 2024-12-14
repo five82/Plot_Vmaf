@@ -1,14 +1,48 @@
 #!/bin/bash
 
-# MacOS Homebrew requirements:
-# brew install ffmpeg libvmaf jq numpy python-matplotlib
+# Function to check if a command exists
+check_dependency() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Error: Required dependency '$1' is not installed."
+        case "$1" in
+            ffmpeg)
+                echo "Install with: brew install ffmpeg"
+                ;;
+            jq)
+                echo "Install with: brew install jq"
+                ;;
+            python3)
+                echo "Install with: brew install python3"
+                ;;
+        esac
+        exit 1
+    fi
+}
 
+# Check required dependencies
+check_dependency ffmpeg
+check_dependency jq
+check_dependency python3
+check_dependency bc
+
+# Check Python packages
+check_python_package() {
+    if ! python3 -c "import $1" >/dev/null 2>&1; then
+        echo "Error: Required Python package '$1' is not installed."
+        echo "Install with: pip3 install $1"
+        exit 1
+    fi
+}
+
+check_python_package numpy
+check_python_package matplotlib
 
 # Add start time capture at the beginning of the script
 START_TIME=$(date +%s)
 
 # Initialize default values
 NO_DENOISE=false
+OUTPUT_DIR=""
 
 # Parse optional parameters
 while [[ $# -gt 0 ]]; do
@@ -17,6 +51,10 @@ while [[ $# -gt 0 ]]; do
             NO_DENOISE=true
             shift
             ;;
+        --output-dir)
+            OUTPUT_DIR="$2"
+            shift 2
+            ;;
         *)
             break
             ;;
@@ -24,23 +62,57 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 [--no_denoise] <reference_video> <distorted_video> [output_prefix]"
-    echo "Example: $0 original.mp4 compressed.mp4 comparison"
+    echo "Usage: generate-vmaf [--no_denoise] [--output-dir <dir>] <reference_video> <distorted_video> [output_prefix]"
+    echo ""
+    echo "Examples:"
+    echo "  # Basic usage"
+    echo "  generate-vmaf reference.mp4 distorted.mp4"
+    echo ""
+    echo "  # With output directory and prefix"
+    echo "  generate-vmaf --output-dir ~/results reference.mp4 distorted.mp4 my_analysis"
+    echo ""
+    echo "  # Disable denoising"
+    echo "  generate-vmaf --no_denoise reference.mp4 distorted.mp4"
+    echo ""
     echo "Options:"
-    echo "  --no_denoise    Disable denoising of the reference video"
+    echo "  --no_denoise     Disable denoising of reference video"
+    echo "  --output-dir     Specify output directory for results (default: current directory)"
+    echo "  [output_prefix]  Optional prefix for output files (default: vmaf_analysis)"
     exit 1
 fi
 
 # Get the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Set Videos directory as working directory
-VIDEOS_DIR="$HOME/Videos"
-cd "$VIDEOS_DIR" || exit 1
+# Set current directory as working directory
+CURRENT_DIR="$(pwd)"
 
-REFERENCE="$1"
-DISTORTED="$2"
+# Use output directory if specified, otherwise use current directory
+if [ -n "$OUTPUT_DIR" ]; then
+    # Create output directory if it doesn't exist
+    mkdir -p "$OUTPUT_DIR"
+    OUTPUT_DIR=$(realpath "$OUTPUT_DIR")
+else
+    OUTPUT_DIR="$CURRENT_DIR"
+fi
+
+REFERENCE=$(realpath "$1")
+DISTORTED=$(realpath "$2")
 PREFIX="${3:-vmaf_analysis}"
+
+# Ensure the output files are written to the specified directory
+PREFIX="$OUTPUT_DIR/$PREFIX"
+
+# Check if input files exist
+if [ ! -f "$REFERENCE" ]; then
+    echo "Error: Reference video file not found: $REFERENCE"
+    exit 1
+fi
+
+if [ ! -f "$DISTORTED" ]; then
+    echo "Error: Distorted video file not found: $DISTORTED"
+    exit 1
+fi
 
 # Define model versions
 VMAF_MODEL="version=vmaf_v0.6.1"
@@ -190,15 +262,30 @@ if [ $? -eq 0 ]; then
         exit 1
     fi
     
-    # Generate plot using the Python script (VMAF metric only)
-    python3 "$SCRIPT_DIR/plot_vmaf.py" "${PREFIX}.json" -m VMAF -o "${PREFIX}_plot.png"
-    
-    if [ $? -eq 0 ]; then
-        echo "Plot generated successfully as ${PREFIX}_plot.png"
-    else
-        echo "Error generating plot"
+    # Generate plot using vmaf-plot command
+    if ! command -v vmaf-plot >/dev/null 2>&1; then
+        echo "Error: vmaf-plot command not found. Please ensure vmaf-tools is installed correctly."
         exit 1
     fi
+    
+    echo "Running: vmaf-plot \"${PREFIX}.json\" -m VMAF -o \"${PREFIX}_plot.png\""
+    # Run vmaf-plot with error output visible
+    if ! vmaf-plot "${PREFIX}.json" -m VMAF -o "${PREFIX}_plot.png"; then
+        echo "Error: Failed to generate plot"
+        echo "vmaf-plot command failed with exit code $?"
+        exit 1
+    fi
+    
+    # Verify plot was actually created
+    if [ ! -f "${PREFIX}_plot.png" ]; then
+        echo "Error: Plot file was not created at ${PREFIX}_plot.png"
+        echo "Current directory: $(pwd)"
+        echo "Output directory: $OUTPUT_DIR"
+        echo "Full path: ${PREFIX}_plot.png"
+        exit 1
+    fi
+    
+    echo "Plot generated successfully as ${PREFIX}_plot.png"
 else
     echo "Error during VMAF analysis"
     exit 1

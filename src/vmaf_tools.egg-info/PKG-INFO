@@ -1,3 +1,15 @@
+Metadata-Version: 2.1
+Name: vmaf-tools
+Version: 0.1.0
+Summary: Tools for VMAF video quality analysis
+Author-email: Your Name <your.email@example.com>
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+
 # Plot_Vmaf
 
 Simple script for vmaf plotting and analysis. Provides tools for generating VMAF scores and creating visualizations of video quality metrics.

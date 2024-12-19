@@ -29,7 +29,14 @@ check_dependency bc
 check_python_package() {
     if ! python3 -c "import $1" >/dev/null 2>&1; then
         echo "Error: Required Python package '$1' is not installed."
-        echo "Install with: pip3 install $1"
+        case "$1" in
+            matplotlib)
+                echo "Install with: brew install python-matplotlib"
+                ;;
+            *)
+                echo "Install with: brew install $1"
+                ;;
+        esac
         exit 1
     fi
 }
@@ -41,14 +48,14 @@ check_python_package matplotlib
 START_TIME=$(date +%s)
 
 # Initialize default values
-NO_DENOISE=false
+NO_DENOISE=true
 OUTPUT_DIR=""
 
 # Parse optional parameters
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --no_denoise)
-            NO_DENOISE=true
+        --denoise)
+            NO_DENOISE=false
             shift
             ;;
         --output-dir)
@@ -62,20 +69,20 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "$#" -lt 2 ]; then
-    echo "Usage: generate-vmaf [--no_denoise] [--output-dir <dir>] <reference_video> <distorted_video> [output_prefix]"
+    echo "Usage: generate-vmaf [--denoise] [--output-dir <dir>] <reference_video> <distorted_video> [output_prefix]"
     echo ""
     echo "Examples:"
-    echo "  # Basic usage"
+    echo "  # Basic usage (no denoising)"
     echo "  generate-vmaf reference.mp4 distorted.mp4"
     echo ""
     echo "  # With output directory and prefix"
     echo "  generate-vmaf --output-dir ~/results reference.mp4 distorted.mp4 my_analysis"
     echo ""
-    echo "  # Disable denoising"
-    echo "  generate-vmaf --no_denoise reference.mp4 distorted.mp4"
+    echo "  # Enable denoising"
+    echo "  generate-vmaf --denoise reference.mp4 distorted.mp4"
     echo ""
     echo "Options:"
-    echo "  --no_denoise     Disable denoising of reference video"
+    echo "  --denoise        Enable denoising of reference video"
     echo "  --output-dir     Specify output directory for results (default: current directory)"
     echo "  [output_prefix]  Optional prefix for output files (default: vmaf_analysis)"
     exit 1

@@ -22,10 +22,12 @@ Simple script for vmaf plotting and analysis. Provides tools for generating VMAF
 - FFmpeg with libvmaf support (for VMAF analysis)
 - bc (for calculations in generate-vmaf)
 - jq (for JSON processing)
+- numpy
+- matplotlib
 
 On macOS, install dependencies with:
 ```bash
-brew install ffmpeg libvmaf jq
+brew install ffmpeg libvmaf jq python numpy python-matplotlib
 ```
 
 ### Python Dependencies
@@ -64,11 +66,11 @@ The `generate-vmaf` command analyzes video quality by:
 - Outputting detailed JSON data and visualization plots
 
 ```bash
-# Basic usage
+# Basic usage (no denoising)
 generate-vmaf reference.mp4 distorted.mp4
 
 # With options
-generate-vmaf --no_denoise --output-dir ~/results reference.mp4 distorted.mp4 my_analysis
+generate-vmaf --denoise --output-dir ~/results reference.mp4 distorted.mp4 my_analysis
 
 # Just specify output prefix
 generate-vmaf reference.mp4 distorted.mp4 comparison
@@ -94,9 +96,9 @@ vmaf-plot -m VMAF PSNR my_analysis.json
 
 #### generate-vmaf
 ```
---no_denoise        Disable denoising of reference video (useful for pristine sources)
---output-dir DIR    Specify output directory (default: current directory)
-[output_prefix]     Optional prefix for output files (default: vmaf_analysis)
+--denoise          Enable denoising of reference video
+--output-dir DIR   Specify output directory (default: current directory)
+[output_prefix]    Optional prefix for output files (default: vmaf_analysis)
 ```
 
 #### vmaf-plot

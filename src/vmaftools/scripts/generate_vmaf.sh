@@ -161,6 +161,15 @@ CROP_Y=$((HEIGHT_DIFF / 2))
 echo "Reference: ${REF_WIDTH}x${REF_HEIGHT}"
 echo "Distorted: ${DIST_WIDTH}x${DIST_HEIGHT}"
 
+# Check if distorted video is larger than reference - likely wrong order
+if [ "$DIST_HEIGHT" -gt "$REF_HEIGHT" ]; then
+    echo "Error: Distorted video height (${DIST_HEIGHT}) is larger than reference video height (${REF_HEIGHT})"
+    echo "This likely means the reference and distorted videos were provided in the wrong order."
+    echo "Usage: generate-vmaf [options] <reference_video> <distorted_video>"
+    echo "The reference video should typically be the higher quality/resolution version."
+    exit 1
+fi
+
 # Determine if we need to crop or scale
 if [ "$DIST_HEIGHT" -lt "$REF_HEIGHT" ] && [ "$DIST_WIDTH" -eq "$REF_WIDTH" ]; then
     # Calculate crop values to remove black bars

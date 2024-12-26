@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Add this near the beginning of the script, after the shebang line
+START_TIME=$(date +%s)
+
 # Initialize logging flag
 ENABLE_LOG=false
 
@@ -434,7 +437,9 @@ echo "- XPSNR plot: ${PREFIX}_xpsnr_plot.png"
 # Calculate and display elapsed time
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
-echo "Total execution time: $((ELAPSED / 60)) minutes and $((ELAPSED % 60)) seconds"
+MINUTES=$((ELAPSED / 60))
+SECONDS=$((ELAPSED % 60))
+echo "Total execution time: ${MINUTES} minutes and ${SECONDS} seconds"
 
 # Add after the merge:
 VMAF_FRAMES=$(jq '.frames | length' "${PREFIX}.json")

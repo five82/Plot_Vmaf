@@ -60,20 +60,39 @@ def plot_multi_metrics(scores, vmaf_file_names):
     plt.savefig(args.output, dpi=500)
 
 def plot_metric(scores, metric):
-    # Filter out infinity, NaN, and invalid values
-    MAX_DOUBLE = 1.7976931348623157e+308  # This is what FFmpeg uses to represent infinity
-    scores = [s for s in scores if s != MAX_DOUBLE and s != float('inf') and s > 0 and s < 100]
-    if not scores:
-        raise ValueError(f"No valid {metric} scores found")
+    # FFmpeg uses MAX_DOUBLE to represent infinity
+    MAX_DOUBLE = 1.7976931348623157e+308
+    
+    # For XPSNR, cap infinite values at a reasonable maximum (e.g. 100 dB)
+    # rather than filtering them out
+    if metric == "XPSNR":
+        XPSNR_MAX = 100  # Maximum reasonable XPSNR value in dB
+        valid_scores = [XPSNR_MAX if (s == MAX_DOUBLE or s == float('inf')) else s for s in scores]
+        # Only filter actually invalid values
+        valid_scores = [s for s in valid_scores if s > 0]
+        
+        inf_count = len([s for s in scores if s == MAX_DOUBLE or s == float('inf')])
+        if inf_count > 0:
+            print(f"Note: Capped {inf_count} infinite XPSNR values to {XPSNR_MAX} dB")
+    else:
+        # For VMAF and other metrics, keep the 0-100 range check
+        valid_scores = [s for s in scores if s != MAX_DOUBLE and s != float('inf') and s > 0 and s < 100]
+    
+    invalid_count = len([s for s in scores if s <= 0])
+    if invalid_count > 0:
+        print(f"Warning: Filtered out {invalid_count} invalid {metric} values <= 0")
 
-    x = [x for x in range(len(scores))]
-    mean = round(sum(scores) / len(scores), 3)
-    plot_size = len(scores)
+    if not valid_scores:
+        raise ValueError(f"No valid {metric} scores found after filtering")
+
+    x = [x for x in range(len(valid_scores))]
+    mean = round(sum(valid_scores) / len(valid_scores), 3)
+    plot_size = len(valid_scores)
 
     # get percentiles
-    perc_1 = round(np.percentile(scores, 1), 3)
-    perc_25 = round(np.percentile(scores, 25), 3)
-    perc_75 = round(np.percentile(scores, 75), 3)
+    perc_1 = round(np.percentile(valid_scores, 1), 3)
+    perc_25 = round(np.percentile(valid_scores, 25), 3)
+    perc_75 = round(np.percentile(valid_scores, 75), 3)
 
     # Plot
     figure_width = 3 + round((4 * log10(plot_size)))
@@ -90,8 +109,8 @@ def plot_metric(scores, metric):
         plt.ylim(perc_1, 1.0)
     elif metric == "XPSNR":
         # Get valid range for XPSNR
-        min_val = max(20, int(min(scores) - 1))
-        max_val = min(60, int(max(scores) + 1))
+        min_val = max(20, int(min(valid_scores) - 1))
+        max_val = min(60, int(max(valid_scores) + 1))
         step = 5 if (max_val - min_val) > 20 else 2
         
         # Draw grid lines
@@ -104,15 +123,15 @@ def plot_metric(scores, metric):
     else:  # PSNR
         [plt.axhline(i, color="grey", linewidth=0.4) for i in range(0, 100)]
         [plt.axhline(i, color="black", linewidth=0.6) for i in range(0, 100, 5)]
-        plt.ylim(int(perc_1), max(scores))
+        plt.ylim(int(perc_1), max(valid_scores))
 
     # Create x-axis values that correspond to the valid scores
-    x = list(range(len(scores)))
+    x = list(range(len(valid_scores)))
 
     plt.plot(
         x,
-        scores,
-        label=f"Valid Frames: {len(scores)} Mean:{mean}\n"
+        valid_scores,
+        label=f"Valid Frames: {len(valid_scores)} Mean:{mean}\n"
         f"1%: {perc_1}  25%: {perc_25}  75%: {perc_75}",
         linewidth=0.7,
     )

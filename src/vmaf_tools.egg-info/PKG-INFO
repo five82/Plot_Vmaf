@@ -10,34 +10,44 @@ Description-Content-Type: text/markdown
 Requires-Dist: numpy
 Requires-Dist: matplotlib
 
-# Plot_Vmaf
+# VMAF Tools
 
-Simple script for vmaf plotting and analysis. Provides tools for generating VMAF scores and creating visualizations of video quality metrics.
+A collection of tools for video quality analysis using VMAF and XPSNR metrics.
+
+Designed for macOS systems.
 
 ![Example VMAF Plot](plot.png)
 
-## Requirements
+## Features
 
-### System Dependencies
-- FFmpeg with libvmaf support (for VMAF analysis)
-- bc (for calculations in generate-vmaf)
-- jq (for JSON processing)
-- numpy
-- matplotlib
+- Generate VMAF and XPSNR scores for video comparisons
+- Support for HDR to SDR conversion
+- Automatic reference video cropping
+- Optional denoising for noisy sources
+- Frame synchronization validation
+- Metric range validation
+- Generate visualization plots
+- Optional logging for debugging
 
-On macOS, install dependencies with:
+## System Requirements
+
+### macOS Dependencies
+Install all required dependencies using Homebrew:
 ```bash
-brew install ffmpeg libvmaf jq python numpy python-matplotlib
+brew install ffmpeg libvmaf gawk jq python python-matplotlib numpy
 ```
 
-### Python Dependencies
-- Python 3.7+
-- pipx
-- numpy
-- matplotlib
+FFmpeg must be compiled with libvmaf and xpsnr support. The Homebrew version of FFmpeg is compiled against libvmaf by default.
+
+To verify FFmpeg has the required support:
+```bash
+ffmpeg -filters | grep -E 'libvmaf|xpsnr'
+```
+You should see both filters listed in the output.
 
 ## Installation
 
+Clone and install locally:
 ```bash
 git clone https://github.com/five82/Plot_Vmaf.git
 cd Plot_Vmaf
@@ -45,7 +55,6 @@ pipx install -e .
 ```
 
 ## Uninstall
-
 ```bash
 # If installed with -e flag
 pipx uninstall vmaf-tools
@@ -57,62 +66,76 @@ rm -rf Plot_Vmaf
 
 ## Usage
 
-### Generate VMAF Scores
-The `generate-vmaf` command analyzes video quality by:
-- Comparing a reference video with a processed/compressed version
-- Handling resolution differences automatically
-- Converting HDR to SDR if needed
-- Using FFmpeg's libvmaf to calculate quality metrics
-- Outputting detailed JSON data and visualization plots
-
 ```bash
-# Basic usage (no denoising)
-generate-vmaf reference.mp4 distorted.mp4
-
-# With options
-generate-vmaf --denoise --output-dir ~/results reference.mp4 distorted.mp4 my_analysis
-
-# Just specify output prefix
-generate-vmaf reference.mp4 distorted.mp4 comparison
-```
-
-### Plot VMAF Data
-Visualize VMAF analysis results from JSON files:
-```bash
-# Basic usage
-vmaf-plot my_analysis.json
-
-# Specify output format
-vmaf-plot my_analysis.json -o analysis.svg
-
-# Compare multiple files
-vmaf-plot analysis1.json analysis2.json -o comparison.png
-
-# Plot specific metrics
-vmaf-plot -m VMAF PSNR my_analysis.json
+generate-vmaf [options] <reference_video> <distorted_video> [output_prefix]
 ```
 
 ### Options
 
-#### generate-vmaf
 ```
---denoise          Enable denoising of reference video
---output-dir DIR   Specify output directory (default: current directory)
-[output_prefix]    Optional prefix for output files (default: vmaf_analysis)
-```
-
-#### vmaf-plot
-```
--o, --output FILE   Graph output file (default: plot.png)
--m, --metrics       Metrics to plot (VMAF, PSNR, SSIM)
+--denoise        Enable denoising of reference video
+--output-dir     Specify output directory for results (default: current directory)
+--log            Enable logging to file
 ```
 
-## Output Files
-For each analysis, generate-vmaf produces:
-- JSON file containing frame-by-frame quality metrics
-- PNG plot visualizing the VMAF scores over time
-- Support for multiple plot formats (png, svg, pdf)
+### Arguments
 
-## Acknowledgments
+```
+reference_video  Original/reference video file
+distorted_video Encoded/processed video file to compare
+output_prefix   Optional prefix for output files (default: vmaf_analysis)
+```
 
-Based on Netflix's VMAF metric and FFmpeg's libvmaf implementation.
+### Examples
+
+```bash
+# Basic usage
+generate-vmaf reference.mp4 distorted.mp4
+
+# With output directory and custom prefix
+generate-vmaf --output-dir ~/results reference.mp4 distorted.mp4 my_analysis
+
+# With logging enabled
+generate-vmaf --log reference.mp4 distorted.mp4
+```
+
+### Outputs
+
+The script generates:
+- JSON file with VMAF and XPSNR metrics
+- VMAF score plot
+- XPSNR score plot
+
+## Features in Detail
+
+### HDR Support
+- Automatic HDR detection
+- HDR to SDR conversion for VMAF analysis
+- Native HDR support for XPSNR analysis
+
+### Validation
+- Frame synchronization checks
+- Metric range validation
+- Configurable thresholds for different content types
+
+### Plotting
+- VMAF score visualization
+- XPSNR score visualization
+- Statistical annotations
+
+Example plot showing VMAF scores over time with statistical annotations:
+
+![Example VMAF Plot](plot.png)
+
+## Development
+
+To contribute:
+
+1. Clone the repository
+2. Install development dependencies
+3. Make your changes
+4. Submit a pull request
+
+## License
+
+MIT

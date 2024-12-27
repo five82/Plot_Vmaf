@@ -1,3 +1,0 @@
-[console_scripts]
-generate-vmaf = vmaftools.cli:generate_vmaf
-vmaf-plot = vmaftools.cli:main

@@ -69,9 +69,33 @@ fi
 
 # Get the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORIGINAL_DIR="$PWD"  # Save the original working directory
 
-# Set current directory as working directory
-CURRENT_DIR="$(pwd)"
+# Find FFmpeg in current directory or parent directories
+find_in_path() {
+    local cmd="$1"
+    local dir="$ORIGINAL_DIR"  # Start search from original directory
+    while [[ "$dir" != "/" ]]; do
+        if [[ -x "$dir/$cmd" ]]; then
+            echo "$dir/$cmd"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    command -v "$cmd"
+}
+
+# Find local FFmpeg first
+FFMPEG=$(find_in_path "ffmpeg")
+FFPROBE=$(find_in_path "ffprobe")
+
+# Get system FFmpeg path for VMAF
+SYSTEM_FFMPEG=$(command -v ffmpeg)
+
+echo "Using FFmpeg: $FFMPEG"
+echo "Using system FFmpeg for VMAF: $SYSTEM_FFMPEG"
+echo "Using FFprobe: $FFPROBE"
+echo
 
 # Use output directory if specified, otherwise use current directory
 if [ -n "$OUTPUT_DIR" ]; then
@@ -79,7 +103,7 @@ if [ -n "$OUTPUT_DIR" ]; then
     mkdir -p "$OUTPUT_DIR"
     OUTPUT_DIR=$(realpath "$OUTPUT_DIR")
 else
-    OUTPUT_DIR="$CURRENT_DIR"
+    OUTPUT_DIR="$ORIGINAL_DIR"
 fi
 
 REFERENCE=$(realpath "$1")
@@ -164,8 +188,8 @@ fi
 # Check if videos are HDR using ffprobe
 is_hdr() {
     local file="$1"
-    local color_space=$(ffprobe -v error -select_streams v:0 -show_entries stream=color_space -of default=noprint_wrappers=1:nokey=1 "$file")
-    local color_transfer=$(ffprobe -v error -select_streams v:0 -show_entries stream=color_transfer -of default=noprint_wrappers=1:nokey=1 "$file")
+    local color_space=$("$FFPROBE" -v error -select_streams v:0 -show_entries stream=color_space -of default=noprint_wrappers=1:nokey=1 "$file")
+    local color_transfer=$("$FFPROBE" -v error -select_streams v:0 -show_entries stream=color_transfer -of default=noprint_wrappers=1:nokey=1 "$file")
     
     if [[ "$color_transfer" == *"smpte2084"* ]] || [[ "$color_transfer" == *"arib-std-b67"* ]]; then
         return 0  # true in bash
@@ -207,12 +231,17 @@ else
     fi
 fi
 
+# Get number of CPU cores (macOS)
+CPU_CORES=$(sysctl -n hw.ncpu)
+
+echo "Using $CPU_CORES CPU cores for processing"
+
 # Prepare input video filter - split into two commands
 # First command for VMAF
 if [ "$DIST_IS_HDR" = true ]; then
-    VMAF_FILTER="[0:v]${HDR_TO_SDR_FILTER},fps=${REF_FPS}:round=near[main2];[1:v]${REF_PROCESS},fps=${REF_FPS}:round=near[main1];[main2][main1]libvmaf=model=$MODEL:log_fmt=json:log_path=${PREFIX}.json:n_threads=4:n_subsample=8"
+    VMAF_FILTER="[0:v]${HDR_TO_SDR_FILTER},fps=${REF_FPS}:round=near[main2];[1:v]${REF_PROCESS},fps=${REF_FPS}:round=near[main1];[main2][main1]libvmaf=model=$MODEL:log_fmt=json:log_path=${PREFIX}.json:n_threads=${CPU_CORES}:n_subsample=8"
 else
-    VMAF_FILTER="[0:v]fps=${REF_FPS}:round=near[main2];[1:v]${REF_PROCESS},fps=${REF_FPS}:round=near[main1];[main2][main1]libvmaf=model=$MODEL:log_fmt=json:log_path=${PREFIX}.json:n_threads=4:n_subsample=8"
+    VMAF_FILTER="[0:v]fps=${REF_FPS}:round=near[main2];[1:v]${REF_PROCESS},fps=${REF_FPS}:round=near[main1];[main2][main1]libvmaf=model=$MODEL:log_fmt=json:log_path=${PREFIX}.json:n_threads=${CPU_CORES}:n_subsample=8"
 fi
 
 # Second command for XPSNR
@@ -223,13 +252,32 @@ else
 fi
 
 # Generate VMAF scores and save to JSON
-ffmpeg -hide_banner -loglevel error -i "$DISTORTED" -i "$REFERENCE" -lavfi "${VMAF_FILTER}" -f null -
+echo "Starting VMAF analysis..."
+echo "VMAF filter: ${VMAF_FILTER}"
+echo
+echo "Command: ffmpeg -hide_banner -i \"$DISTORTED\" -i \"$REFERENCE\" -lavfi \"${VMAF_FILTER}\" -f null -"
+echo "----------------------------------------"
+"$SYSTEM_FFMPEG" -hide_banner -loglevel warning -stats -i "$DISTORTED" -i "$REFERENCE" -lavfi "${VMAF_FILTER}" -f null -
+echo "----------------------------------------"
+echo
 
 # Generate XPSNR scores
-if ! ffmpeg -hide_banner -i "$DISTORTED" -i "$REFERENCE" -lavfi "${XPSNR_FILTER}" -f null -; then
+echo "Starting XPSNR analysis..."
+echo "XPSNR filter: ${XPSNR_FILTER}"
+echo
+echo "Command: ffmpeg -hide_banner -i \"$DISTORTED\" -i \"$REFERENCE\" -lavfi \"${XPSNR_FILTER}\" -f null -"
+echo "----------------------------------------"
+if ! "$FFMPEG" -hide_banner -loglevel warning -stats \
+    -threads ${CPU_CORES} \
+    -filter_threads ${CPU_CORES} \
+    -filter_complex_threads ${CPU_CORES} \
+    -i "$DISTORTED" -i "$REFERENCE" \
+    -lavfi "${XPSNR_FILTER}" -f null -; then
     echo "Error: XPSNR calculation failed"
     exit 1
 fi
+echo "----------------------------------------"
+echo
 
 # Check for GNU awk
 if ! command -v gawk >/dev/null 2>&1; then
@@ -239,6 +287,8 @@ if ! command -v gawk >/dev/null 2>&1; then
 fi
 
 # Convert XPSNR log to JSON
+echo "Converting XPSNR log to JSON..."
+echo "----------------------------------------"
 if ! gawk '
 BEGIN { 
     print "{"
@@ -288,6 +338,8 @@ END {
     tail -n 5 "${PREFIX}_xpsnr.log"
     exit 1
 fi
+echo "----------------------------------------"
+echo
 
 # Validate XPSNR JSON
 if ! jq empty "${PREFIX}_xpsnr.json" 2>/dev/null; then

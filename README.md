@@ -123,7 +123,3 @@ To contribute:
 2. Install development dependencies
 3. Make your changes
 4. Submit a pull request
-
-## License
-
-MIT
